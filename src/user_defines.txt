@@ -16,7 +16,13 @@
 
 ### REGULATORY DOMAIN: ###
 
-# Domain is used to define correct frequency band for 900MHz hardware.
+# Domain is used to define correct frequency band for 900MHz and 2.4GHz hardware.
+# FCC (USA), KC (Korea), GITEKI (Japan), ISM (Worldwide 2.4GHz): 2400-2483.5MHz up to 100mW
+-DRegulatory_Domain_ISM_2400
+
+# CE (Europe): 2.4GHz LBT (Listen Before Talk) & 10mW power cap
+#-DRegulatory_Domain_EU_CE_2400
+
 #-DRegulatory_Domain_AU_915
 #-DRegulatory_Domain_EU_868
 #-DRegulatory_Domain_IN_866
@@ -25,8 +31,7 @@
 #-DRegulatory_Domain_US_433
 #-DRegulatory_Domain_US_433_WIDE
 #-DRegulatory_Domain_FCC_915
-#-DRegulatory_Domain_ISM_2400
-#-DRegulatory_Domain_EU_CE_2400
+
 
 ### PERFORMANCE OPTIONS: ###
 
