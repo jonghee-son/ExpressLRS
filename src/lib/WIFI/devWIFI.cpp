@@ -22,6 +22,7 @@
 #include <DNSServer.h>
 
 #include <set>
+#include <cstdlib>
 #include <StreamString.h>
 
 #include <ESPAsyncWebServer.h>
@@ -981,7 +982,44 @@ static void WebUpdateGetFirmware(AsyncWebServerRequest *request) {
 
 static void HandleContinuousWave(AsyncWebServerRequest *request) {
   if (request->hasArg("radio")) {
-    SX12XX_Radio_Number_t radio = request->arg("radio").toInt() == 1 ? SX12XX_Radio_1 : SX12XX_Radio_2;
+    const int radios = (GPIO_PIN_NSS_2 == UNDEF_PIN) ? 1 : 2;
+    const String radioValue = request->arg("radio");
+    char *radioEnd = nullptr;
+    const long requestedRadio = strtol(radioValue.c_str(), &radioEnd, 10);
+    if (radioEnd == radioValue.c_str() || *radioEnd != '\0' || requestedRadio < 1 || requestedRadio > radios) {
+      request->send(400, "text/plain", "Invalid radio; expected 1 or 2");
+      return;
+    }
+    SX12XX_Radio_Number_t radio = requestedRadio == 1 ? SX12XX_Radio_1 : SX12XX_Radio_2;
+
+    uint32_t frequency = FHSSconfig->freq_center;
+    PowerLevels_e power = POWERMGNT::getMinPower();
+
+#if defined(REGULATORY_CERT_TEST)
+    if (request->hasArg("frequency")) {
+      const String frequencyValue = request->arg("frequency");
+      const char *value = frequencyValue.c_str();
+      char *end = nullptr;
+      const unsigned long parsed = strtoul(value, &end, 10);
+      if (end == value || *end != '\0' || parsed < FHSSgetMinimumFreq() || parsed > FHSSgetMaximumFreq()) {
+        request->send(400, "text/plain", "Invalid frequency; use a value inside the configured FHSS band");
+        return;
+      }
+      frequency = (uint32_t)parsed;
+    }
+
+    if (request->hasArg("power")) {
+      const String powerValue = request->arg("power");
+      char *powerEnd = nullptr;
+      const long requestedPower = strtol(powerValue.c_str(), &powerEnd, 10);
+      if (powerEnd == powerValue.c_str() || *powerEnd != '\0' ||
+          requestedPower < POWERMGNT::getMinPower() || requestedPower > POWERMGNT::getMaxPower()) {
+        request->send(400, "text/plain", "Invalid power level");
+        return;
+      }
+      power = (PowerLevels_e)requestedPower;
+    }
+#endif
 
 #if defined(RADIO_LR1121)
     bool setSubGHz = false;
@@ -996,23 +1034,31 @@ static void HandleContinuousWave(AsyncWebServerRequest *request) {
     Radio.Begin(FHSSgetMinimumFreq(), FHSSgetMaximumFreq());
 
     POWERMGNT::init();
-    POWERMGNT::setPower(POWERMGNT::getMinPower());
+    POWERMGNT::setPower(power);
 
 #if defined(RADIO_LR1121)
     Radio.startCWTest(setSubGHz ? FHSSconfig->freq_center : FHSSconfigDualBand->freq_center, radio);
 #else
-    Radio.startCWTest(FHSSconfig->freq_center, radio);
+    Radio.startCWTest(frequency, radio);
 #if defined(RADIO_SX127X)
     deferExecutionMillis(50, [radio](){ Radio.cwRepeat(radio); });
 #endif
 #endif
   } else {
     int radios = (GPIO_PIN_NSS_2 == UNDEF_PIN) ? 1 : 2;
-    request->send(200, "application/json", String("{\"radios\": ") + radios + ", \"center\": "+ FHSSconfig->freq_center +
+    String response = String("{\"radios\": ") + radios + ", \"center\": "+ FHSSconfig->freq_center +
 #if defined(RADIO_LR1121)
             ", \"center2\": "+ FHSSconfigDualBand->freq_center +
 #endif
-            "}");
+            "";
+#if defined(REGULATORY_CERT_TEST)
+    response += String(", \"certificationTest\": true, \"minimum\": ") + FHSSgetMinimumFreq() +
+            ", \"maximum\": " + FHSSgetMaximumFreq() +
+            ", \"powerMin\": " + (int)POWERMGNT::getMinPower() +
+            ", \"powerMax\": " + (int)POWERMGNT::getMaxPower();
+#endif
+    response += "}";
+    request->send(200, "application/json", response);
   }
 }
 

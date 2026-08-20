@@ -139,6 +139,23 @@ json_flags['wifi-on-interval'] = -1
 
 process_flags("user_defines.txt")
 process_flags("super_defines.txt") # allow secret super_defines to override user_defines
+
+# Build helpers can supply a binding phrase for this process without modifying
+# user_defines.txt. Apply it last so it intentionally overrides a phrase from
+# either defines file while preserving the exact UID derivation used elsewhere.
+environment_binding_phrase = os.environ.get("ELRS_BINDING_PHRASE")
+if environment_binding_phrase is not None:
+    if '"' in environment_binding_phrase or '\r' in environment_binding_phrase or '\n' in environment_binding_phrase:
+        print_error('ELRS_BINDING_PHRASE cannot contain quotes or line breaks')
+    binding_define = '-DMY_BINDING_PHRASE="' + environment_binding_phrase + '"'
+    binding_phrase_hash = hashlib.md5(binding_define.encode()).digest()
+    UIDbytes = ",".join(list(map(str, binding_phrase_hash))[0:6])
+    build_flags = [flag for flag in build_flags if not flag.startswith("-DMY_UID=")]
+    build_flags.append("-DMY_UID=" + UIDbytes)
+    process_json_flag(binding_define)
+    sys.stdout.write("\u001b[32mUID bytes: " + UIDbytes + "\n")
+    sys.stdout.flush()
+
 version_to_env()
 build_flags.append("-DLATEST_COMMIT=" + get_git_sha())
 build_flags.append("-DLATEST_VERSION=" + get_version())

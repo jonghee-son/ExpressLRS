@@ -9,6 +9,9 @@ Builds, flashes, and verifies the ROBOTIS BIC37 ExpressLRS receiver firmware.
 .\build-flash-robotis-rx.ps1 -Port COM7
 
 .EXAMPLE
+.\build-flash-robotis-rx.ps1 -BindPhrase "my private phrase"
+
+.EXAMPLE
 .\build-flash-robotis-rx.ps1 -BuildOnly
 
 .NOTES
@@ -21,6 +24,8 @@ param(
     [ValidateRange(9600, 2000000)]
     [int]$Baud = 115200,
     [string]$EnvironmentName = "ROBOTIS_2400_RX_via_UART",
+    [AllowEmptyString()]
+    [string]$BindPhrase,
     [switch]$SkipBuild,
     [switch]$BuildOnly,
     [switch]$NoPrompt
@@ -113,6 +118,20 @@ $platformIO = Find-PlatformIO
 Write-Host "PlatformIO: $platformIO"
 Write-Host "Environment: $EnvironmentName"
 
+$bindPhraseWasSpecified = $PSBoundParameters.ContainsKey("BindPhrase")
+if ($bindPhraseWasSpecified -and $SkipBuild) {
+    throw "-BindPhrase requires a build; do not combine it with -SkipBuild."
+}
+if ($bindPhraseWasSpecified -and ($BindPhrase.Contains('"') -or $BindPhrase.Contains("`r") -or $BindPhrase.Contains("`n"))) {
+    throw "The binding phrase cannot contain quotes or line breaks."
+}
+
+$previousBindingPhrase = [Environment]::GetEnvironmentVariable("ELRS_BINDING_PHRASE", "Process")
+if ($bindPhraseWasSpecified) {
+    [Environment]::SetEnvironmentVariable("ELRS_BINDING_PHRASE", $BindPhrase, "Process")
+    Write-Host "Binding: custom phrase will be embedded (phrase hidden)"
+}
+
 Push-Location $projectDirectory
 try {
     if (-not $SkipBuild) {
@@ -188,4 +207,7 @@ try {
 }
 finally {
     Pop-Location
+    if ($bindPhraseWasSpecified) {
+        [Environment]::SetEnvironmentVariable("ELRS_BINDING_PHRASE", $previousBindingPhrase, "Process")
+    }
 }
