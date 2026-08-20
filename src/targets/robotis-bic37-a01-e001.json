@@ -1,0 +1,13 @@
+{
+    "product_name": "ROBOTIS 2.4GHz dual radio RX",
+    "lua_name": "ROBOTIS RX",
+    "layout_file": "Generic 2400 True Diversity PA.json",
+    "overlay": {
+        "radio_dcdc": true,
+        "radio_rst_2": -1
+    },
+    "upload_methods": ["uart", "wifi", "betaflight"],
+    "min_version": "4.1.0",
+    "platform": "esp32",
+    "firmware": "Unified_ESP32_2400_RX"
+}
